@@ -1,6 +1,12 @@
-from states_declaration import States
 from time import sleep
+from machine import Pin
 #from machine import I2C
+
+"""
+Declaracion de Pines
+"""
+HC_SR04_TRIG = 27
+HC_SR04_ECHO = 26
 
 class StateMachine(object):
 
@@ -17,8 +23,6 @@ class StateMachine(object):
             print("Iniciando RaspPi")
             print("iniciando RFID")
             print("Iniciando Display")
-
-            
             
             return StateMachine.EsperandoPago(self, 'inicio_correcto')
         
@@ -59,7 +63,33 @@ class StateMachine(object):
         pass
 
     def LecturaSensor(self, event):
-        pass
+        """
+        Comprobar que un producto haya caido usando el HC-SR04.
+        """
+        trig = Pin(HC_SR04_TRIG, Pin.OUT, value = 0)
+        echo = Pin(HC_SR04_ECHO, Pin.IN)
+
+        trig.value(1)
+        sleep_us(10)
+        trig.value(0)
+
+        duracion = machine.time_pulse_us(echo, 1, timeout_us = 40000)
+        
+        distancia = duracion / 58
+        
+        if distancia < 30:
+            return StateMachine.EsperandoPago(self, 'compra_exitosa')
+        else:
+            if event == 'p_1' or event == 'p_2' or event == 'p_3' or event == 'p_4':
+                retry_product = {
+                    'p_1': 'r_p_1',
+                    'p_2': "r_p_2",
+                    'p_3': 'r_p_3',
+                    'p_4': "r_p_4",
+                    }
+                return StateMachine.ActivarMotor(self, retry_product[event])
+            else:
+                return StateMachine.FinalizarError(self, 'error')
 
     def FinalizarError(self, event):
         pass
