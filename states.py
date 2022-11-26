@@ -1,27 +1,33 @@
-from state import State
+from states_declaration import States
 from time import sleep
 #from machine import I2C
 
-class Iniciar(State):
-    """
-    Inicializar todos los servicios.
-    """
-    def on_event(self, event):
-        # Iniciar I2C
-        print("Iniciando I2C")
+class StateMachine(object):
+
+    def Iniciar(self, event):
+        """
+        Inicializar todos los servicios.
+        """
+        if event == 'iniciar':
+
+            # Iniciar I2C
+            print("Iniciando I2C")
+            
+            # Iniciar dispositivos
+            print("Iniciando RaspPi")
+            print("iniciando RFID")
+            print("Iniciando Display")
+
+            
+            
+            return StateMachine.EsperandoPago(self, 'inicio_correcto')
         
-        # Iniciar dispositivos
-        print("Iniciando RaspPi")
-        print("iniciando RFID")
-        print("Iniciando Display")
+        pass
 
-        return EsperandoPago.on_event(self, 'inicio_correcto')
-
-class EsperandoPago(State):
-    """
-    Esperar por un "pago" en el modulo RFID.
-    """
-    def on_event(self, event):
+    def EsperandoPago(self, event):
+        """
+        Esperar por un "pago" en el modulo RFID.
+        """
         nfc = ''
         if event == 'inicio_correcto' or event == 'compra_exitosa':
             
@@ -30,35 +36,30 @@ class EsperandoPago(State):
                 nfc = input("Lectura nfc:")
                 sleep(2)
 
-            return LecturaCamara().on_event(self, 'pago_recibido')
+            return StateMachine.LecturaCamara(self, 'pago_recibido')
         
-        return self
+        pass
 
-class LecturaCamara(State):
-    """
-    Obtener el producto con la RPi/Camara.
-    """
-    def on_event(self, event):
+    def LecturaCamara(self, event):
+        """
+        Obtener el producto con la RPi/Camara.
+        """
         if event == 'pago_recibido':
             # Placeholder para la comunicacion con la RPi/Camara
             producto = input("Lectura camara:") # p_[1,2,3,4]
             sleep(2)
-            return
+            return StateMachine.ConfirmarCamara(self, producto)
 
-        return self
+        pass
 
-class ConfirmarCamara(State):
-    def on_event(self, event):
-        return self
+    def ConfirmarCamara(self, event):
+        pass
 
-class ActivarMotor(State):
-    def on_event(self, event):
-        return self
+    def ActivarMotor(self, event):
+        pass
 
-class LecturaSensor(State):
-    def on_event(self, event):
-        return self
+    def LecturaSensor(self, event):
+        pass
 
-class FinalizarError(State):
-    def on_event(self, event):
-        return self
+    def FinalizarError(self, event):
+        pass
