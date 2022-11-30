@@ -1,12 +1,39 @@
 from time import sleep
+from time import sleep_us
 from machine import Pin
-#from machine import I2C
+from machine import time_pulse_us
+from machine import UART
+import moda
 
 """
 Declaracion de Pines
 """
 HC_SR04_TRIG = 27
 HC_SR04_ECHO = 26
+RFID_TRIG = 25
+RASP_TX = 0 # No se utiliza
+RASP_RX = 4
+MOTOR_1 = 12
+MOTOR_2 = 13
+MOTOR_3 = 14
+MOTOR_4 = 15
+
+DIC_PRODUCTO = {
+                    b'0': 'cancelar',
+                    b'1': 'p_1',
+                    b'2': 'p_2',
+                    b'3': 'p_3',
+                    b'4': 'p_4',
+                    b'5': 'confirmar'
+                }
+
+RETRY_PRODUCT = {
+                    'p_1': 'r_p_1',
+                    'p_2': "r_p_2",
+                    'p_3': 'r_p_3',
+                    'p_4': "r_p_4",
+                }
+
 
 class StateMachine(object):
 
@@ -16,80 +43,158 @@ class StateMachine(object):
         """
         if event == 'iniciar':
 
-            # Iniciar I2C
-            print("Iniciando I2C")
-            
             # Iniciar dispositivos
-            print("Iniciando RaspPi")
-            print("iniciando RFID")
-            print("Iniciando Display")
+            print("Iniciando Sensor") #Debug
+            self.trig = Pin(HC_SR04_TRIG, Pin.OUT, value = 0)
+            self.echo = Pin(HC_SR04_ECHO, Pin.IN)
+
+            print("Iniciando RFID") #Debug
+            self.rfid = Pin(RFID_TRIG, Pin.IN)
+
+            print("Iniciando Motores") #Debug
+            self.mot1 = Pin(MOTOR_1, Pin.OUT, value = 0)
+            self.mot2 = Pin(MOTOR_2, Pin.OUT, value = 0)
+            self.mot3 = Pin(MOTOR_3, Pin.OUT, value = 0)
+            self.mot4 = Pin(MOTOR_4, Pin.OUT, value = 0)
+
+            print("Iniciando RaspPi") #Debug
+            self.uart2 = UART(2, baudrate=9600, tx=RASP_TX, rx=RASP_RX)
+            self.uart2.init(bits=8, parity=None, stop=1)
             
-            return StateMachine.EsperandoPago(self, 'inicio_correcto')
-        
-        pass
+            print("llamando EsperandoPago") #Debug
+            return self.EsperandoPago('inicio_correcto')
 
     def EsperandoPago(self, event):
         """
         Esperar por un "pago" en el modulo RFID.
         """
-        nfc = ''
+        print("EsperandoPago") #Debug
         if event == 'inicio_correcto' or event == 'compra_exitosa':
-            
-            while nfc != '1':
-                # Placeholder para la comunicacion con el RFID
-                nfc = input("Lectura nfc:")
-                sleep(2)
+                        
+            while self.rfid.value() != 1:
+                sleep_us(1)
 
-            return StateMachine.LecturaCamara(self, 'pago_recibido')
-        
-        pass
+            print("llamando LecturaCamara")
+            return self.LecturaCamara('pago_recibido')
 
     def LecturaCamara(self, event):
         """
         Obtener el producto con la RPi/Camara.
         """
-        if event == 'pago_recibido':
-            # Placeholder para la comunicacion con la RPi/Camara
-            producto = input("Lectura camara:") # p_[1,2,3,4]
-            sleep(2)
-            return StateMachine.ConfirmarCamara(self, producto)
 
-        pass
+        print("LecturaCamara") #Debug
+        if event == 'pago_recibido' or event == 'reintentar_lectura':
+            sleep(4)
+            self.uart2.read()
+            sleep(3)
+
+            lectura = []
+
+            for x in range(10):
+                lectura.append(self.uart2.read(1))
+
+            print(lectura) #Debug
+
+            producto = DIC_PRODUCTO[moda.Moda(lectura)]
+
+            print(producto) #Debug
+
+            if producto == 'confirmar' or producto == 'cancelar':
+                print("llamando LecturaCamara again") #Debug
+                return self.LecturaCamara('reintentar_lectura')
+
+            print("llamando ConfirmarCamara") #Debug
+            return self.ConfirmarCamara(producto)
 
     def ConfirmarCamara(self, event):
-        pass
+        """
+        Confirmar la seleccion con la RPi/Camara.
+        """
+        print("ConfirmarCamara") #Debug
+        if event == 'p_1' or event == 'p_2' or event == 'p_3' or event == 'p_4' or event == 'reintentar_lectura':
+            sleep(4)
+            self.uart2.read()
+            sleep(3)
+
+            lectura = []
+
+            for x in range(10):
+                lectura.append(self.uart2.read(1))
+    
+            print(lectura) #Debug
+            
+            producto = DIC_PRODUCTO[moda.Moda(lectura)]
+            
+            print(producto) #Debug
+
+            if producto == 'cancelar':
+                print("llamando LecturaCamara again") #Debug
+                return self.LecturaCamara('reintentar_lectura')
+            elif producto == 'confirmar':
+                print("llamando ActivarMotor") #Debug
+                return self.ActivarMotor(event)
+            else:
+                print("llamando ConfirmarCamara again") #Debug
+                return self.ConfirmarCamara('reintentar_lectura')  
 
     def ActivarMotor(self, event):
-        pass
+        """
+        Activar el motor correspondiente al producto.
+        """
+
+        print("ActivarMotor") #Debug
+        print(event) #Debug
+        if event == 'p_1' or event == 'r_p_1':
+            self.mot1.value(1)
+            sleep(4)
+            self.mot1.value(0)
+
+        elif event == 'p_2' or event == 'r_p_2':
+            self.mot2.value(1)
+            sleep(4)
+            self.mot2.value(0)
+
+        elif event == 'p_3' or event == 'r_p_3':
+            self.mot3.value(1)
+            sleep(4)
+            self.mot3.value(0)
+
+        elif event == 'p_4' or event == 'r_p_4':
+            self.mot4.value(1)
+            sleep(4)
+            self.mot4.value(0)
+
+        print("llamando LecturaSensor")
+        return self.LecturaSensor(event)
 
     def LecturaSensor(self, event):
         """
         Comprobar que un producto haya caido usando el HC-SR04.
         """
-        trig = Pin(HC_SR04_TRIG, Pin.OUT, value = 0)
-        echo = Pin(HC_SR04_ECHO, Pin.IN)
 
-        trig.value(1)
+        self.trig.value(1)
         sleep_us(10)
-        trig.value(0)
+        self.trig.value(0)
 
-        duracion = machine.time_pulse_us(echo, 1, timeout_us = 40000)
+        duracion = time_pulse_us(self.echo, 1, 30000)
         
-        distancia = duracion / 58
+        distancia = (duracion / 2) / 29.1
+        
+        print('Distancia: {0}'.format(distancia)) #Debug
         
         if distancia < 30:
-            return StateMachine.EsperandoPago(self, 'compra_exitosa')
+            return self.EsperandoPago('compra_exitosa')
         else:
             if event == 'p_1' or event == 'p_2' or event == 'p_3' or event == 'p_4':
-                retry_product = {
-                    'p_1': 'r_p_1',
-                    'p_2': "r_p_2",
-                    'p_3': 'r_p_3',
-                    'p_4': "r_p_4",
-                    }
-                return StateMachine.ActivarMotor(self, retry_product[event])
+                
+                print('Retry motor: ' + RETRY_PRODUCT[event]) #Debug
+
+                return self.ActivarMotor(RETRY_PRODUCT[event])
             else:
-                return StateMachine.FinalizarError(self, 'error')
+
+                print('error') #Debug
+
+                return self.FinalizarError('error')
 
     def FinalizarError(self, event):
-        pass
+        print("Algo salio mal xddd")
