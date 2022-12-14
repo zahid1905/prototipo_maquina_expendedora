@@ -13,10 +13,11 @@ HC_SR04_ECHO = 26
 RFID_TRIG = 25
 RASP_TX = 0 # No se utiliza
 RASP_RX = 4
-MOTOR_1 = 12
-MOTOR_2 = 13
-MOTOR_3 = 14
-MOTOR_4 = 15
+MOTOR_1_IN1 = 12
+MOTOR_2_IN4 = 13
+MOTOR_3_IN1 = 14
+MOTOR_4_IN4 = 15
+MOTOR_1_4_IN2_IN3 = 2
 
 DIC_PRODUCTO = {
                     b'0': 'cancelar',
@@ -32,7 +33,7 @@ RETRY_PRODUCT = {
                     'p_2': "r_p_2",
                     'p_3': 'r_p_3',
                     'p_4': "r_p_4",
-                }
+                } 
 
 
 class StateMachine(object):
@@ -41,7 +42,7 @@ class StateMachine(object):
         """
         Inicializar todos los servicios.
         """
-        if event == 'iniciar':
+        if event == 'iniciar' or 'test':
 
             # Iniciar dispositivos
             print("Iniciando Sensor") #Debug
@@ -52,16 +53,19 @@ class StateMachine(object):
             self.rfid = Pin(RFID_TRIG, Pin.IN)
 
             print("Iniciando Motores") #Debug
-            self.mot1 = Pin(MOTOR_1, Pin.OUT, value = 0)
-            self.mot2 = Pin(MOTOR_2, Pin.OUT, value = 0)
-            self.mot3 = Pin(MOTOR_3, Pin.OUT, value = 0)
-            self.mot4 = Pin(MOTOR_4, Pin.OUT, value = 0)
+            self.mot1_4 = Pin(MOTOR_1_4_IN2_IN3, Pin.OUT, value = 0)
+            self.mot1 = Pin(MOTOR_1_IN1, Pin.OUT, value = 0)
+            self.mot2 = Pin(MOTOR_2_IN4, Pin.OUT, value = 0)
+            self.mot3 = Pin(MOTOR_3_IN1, Pin.OUT, value = 0)
+            self.mot4 = Pin(MOTOR_4_IN4, Pin.OUT, value = 0)
 
             print("Iniciando RaspPi") #Debug
             self.uart2 = UART(2, baudrate=9600, tx=RASP_TX, rx=RASP_RX)
             self.uart2.init(bits=8, parity=None, stop=1)
             
             print("llamando EsperandoPago") #Debug
+            if event == 'test':
+                return self.ActivarMotor('p_1')
             return self.EsperandoPago('inicio_correcto')
 
     def EsperandoPago(self, event):
@@ -111,7 +115,7 @@ class StateMachine(object):
         Confirmar la seleccion con la RPi/Camara.
         """
         print("ConfirmarCamara") #Debug
-        if event == 'p_1' or event == 'p_2' or event == 'p_3' or event == 'p_4' or event == 'reintentar_lectura':
+        if event == 'p_1' or event == 'p_2' or event == 'p_3' or event == 'p_4':
             sleep(4)
             self.uart2.read()
             sleep(3)
@@ -135,7 +139,7 @@ class StateMachine(object):
                 return self.ActivarMotor(event)
             else:
                 print("llamando ConfirmarCamara again") #Debug
-                return self.ConfirmarCamara('reintentar_lectura')  
+                return self.ConfirmarCamara(event)  
 
     def ActivarMotor(self, event):
         """
@@ -146,22 +150,22 @@ class StateMachine(object):
         print(event) #Debug
         if event == 'p_1' or event == 'r_p_1':
             self.mot1.value(1)
-            sleep(4)
+            sleep(3)
             self.mot1.value(0)
 
         elif event == 'p_2' or event == 'r_p_2':
             self.mot2.value(1)
-            sleep(4)
+            sleep(3)
             self.mot2.value(0)
 
         elif event == 'p_3' or event == 'r_p_3':
             self.mot3.value(1)
-            sleep(4)
+            sleep(3)
             self.mot3.value(0)
 
         elif event == 'p_4' or event == 'r_p_4':
             self.mot4.value(1)
-            sleep(4)
+            sleep(3)
             self.mot4.value(0)
 
         print("llamando LecturaSensor")
@@ -182,7 +186,7 @@ class StateMachine(object):
         
         print('Distancia: {0}'.format(distancia)) #Debug
         
-        if distancia < 30:
+        if distancia < 13:
             return self.EsperandoPago('compra_exitosa')
         else:
             if event == 'p_1' or event == 'p_2' or event == 'p_3' or event == 'p_4':
