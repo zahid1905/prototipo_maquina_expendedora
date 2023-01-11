@@ -18,6 +18,7 @@ MOTOR_2_IN4 = 13
 MOTOR_3_IN1 = 14
 MOTOR_4_IN4 = 15
 MOTOR_1_4_IN2_IN3 = 2
+LED_ESTADO = 32
 
 DIC_PRODUCTO = {
                     b'0': 'cancelar',
@@ -62,6 +63,7 @@ class StateMachine(object):
             print("Iniciando RaspPi") #Debug
             self.uart2 = UART(2, baudrate=9600, tx=RASP_TX, rx=RASP_RX)
             self.uart2.init(bits=8, parity=None, stop=1)
+            self.led = Pin(LED_ESTADO, Pin.OUT, value = 0)
             
             print("llamando EsperandoPago") #Debug
             if event == 'test':
@@ -88,20 +90,31 @@ class StateMachine(object):
 
         print("LecturaCamara") #Debug
         if event == 'pago_recibido' or event == 'reintentar_lectura':
+            self.led.value(1)
             sleep(4)
             self.uart2.read()
             sleep(3)
 
             lectura = []
 
-            for x in range(10):
+            for x in range(9):
                 lectura.append(self.uart2.read(1))
-
+                
             print(lectura) #Debug
 
-            producto = DIC_PRODUCTO[moda.Moda(lectura)]
+            lista = [i for i in lectura if i is not None]
+
+            print(lista) #Debug
+
+            if not lista:
+                print("llamando LecturaCamara again") #Debug
+                return self.LecturaCamara('reintentar_lectura')
+            
+            producto = DIC_PRODUCTO[moda.Moda(lista)]
 
             print(producto) #Debug
+
+            self.led.value(0)
 
             if producto == 'confirmar' or producto == 'cancelar':
                 print("llamando LecturaCamara again") #Debug
@@ -116,6 +129,7 @@ class StateMachine(object):
         """
         print("ConfirmarCamara") #Debug
         if event == 'p_1' or event == 'p_2' or event == 'p_3' or event == 'p_4':
+            self.led.value(1)
             sleep(4)
             self.uart2.read()
             sleep(3)
@@ -124,12 +138,20 @@ class StateMachine(object):
 
             for x in range(10):
                 lectura.append(self.uart2.read(1))
-    
+
             print(lectura) #Debug
+
+            lista = [i for i in lectura if i is not None]
+
+            print(lista) #Debug
+
+            if not lista:
+                print("llamando LecturaCamara again") #Debug
+                return self.LecturaCamara('reintentar_lectura')
             
-            producto = DIC_PRODUCTO[moda.Moda(lectura)]
-            
-            print(producto) #Debug
+            producto = DIC_PRODUCTO[moda.Moda(lista)]
+
+            self.led.value(0)
 
             if producto == 'cancelar':
                 print("llamando LecturaCamara again") #Debug
