@@ -97,7 +97,7 @@ class StateMachine(object):
 
             lectura = []
 
-            for x in range(9):
+            for x in range(10):
                 lectura.append(self.uart2.read(1))
                 
             print(lectura) #Debug
