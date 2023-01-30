@@ -208,7 +208,7 @@ class StateMachine(object):
         
         print('Distancia: {0}'.format(distancia)) #Debug
         
-        if distancia < 13:
+        if distancia < 20:
             return self.EsperandoPago('compra_exitosa')
         else:
             if event == 'p_1' or event == 'p_2' or event == 'p_3' or event == 'p_4':
